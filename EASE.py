@@ -3,10 +3,12 @@ from cornac.metrics import Recall, NDCG, NCRR
 import numpy as np
 import pandas as pd
 import os
+import statistics
 
 SEED = 42
 TOPK = 50
-LAMB = 5000
+LAMB = 3203
+POSB = True
 VERBOSE = True
 
 print("Đang load dữ liệu...")
@@ -34,7 +36,7 @@ print("\nTrain model EASE trên train set...")
 
 model = cornac.models.EASE(
     lamb=LAMB,
-    posB=True,
+    posB=POSB,
     seed=SEED,
     verbose=VERBOSE,
 )
@@ -64,9 +66,10 @@ print("KẾT QUẢ TRÊN PROBE (EASE):")
 print("-" * 60)
 recall, ndcg, ncrr = ranking_results
 
-print(f"Recall@50 : {recall:.4f}")
-print(f"NDCG@50   : {ndcg:.4f}")
-print(f"NCRR@50   : {ncrr:.4f}")
+print(f"Recall@50 : {recall:.6f}")
+print(f"NDCG@50   : {ndcg:.6f}")
+print(f"NCRR@50   : {ncrr:.6f}")
+print(f"Harmonic Mean   : {statistics.harmonic_mean([recall, ndcg, ncrr]):.6f}")
 print("=" * 80)
 
 print("\nTạo submission.txt...")
@@ -74,7 +77,6 @@ print("\nTạo submission.txt...")
 train_matrix = model.train_set.matrix
 B = model.B
 scores = train_matrix.dot(B)
-topk = 50
 uid_map = model.train_set.uid_map
 iid_reverse_map = {v: k for k, v in model.train_set.iid_map.items()}
 submission = []
@@ -95,7 +97,7 @@ for user in range(46612):
     seen = train_matrix[uid_idx].indices
     s[seen] = -np.inf
 
-    top_items = np.argpartition(-s, topk)[:topk]
+    top_items = np.argpartition(-s, TOPK)[:TOPK]
     top_items = top_items[np.argsort(-s[top_items])]
 
     top_original = [str(iid_reverse_map[i]) for i in top_items]
