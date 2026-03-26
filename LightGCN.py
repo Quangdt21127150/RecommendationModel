@@ -30,13 +30,18 @@ print(f"Số interaction probe: {len(probe_triples)}")
 
 train_set = cornac.data.Dataset.from_uir(train_triples, seed=SEED)
 
-print("\nTrain model EASE trên train set...")
+print("\nTrain model LightGCN trên train set...")
 
-model = cornac.models.EASE(
-    lamb=3203,
-    posB=True,
+model = cornac.models.LightGCN(
+    emb_size=160,
+    num_layers=2,
+    num_epochs=150,
+    learning_rate=0.002,
+    batch_size=16384,
+    lambda_reg=1e-4,
+    early_stopping={"min_delta": 1e-5, "patience": 20},
     seed=SEED,
-    verbose=VERBOSE,
+    verbose=True,
 )
 
 model.fit(train_set)
@@ -60,7 +65,7 @@ ranking_results, _ = cornac.eval_methods.ranking_eval(
 )
 
 print("\n" + "=" * 80)
-print("KẾT QUẢ TRÊN PROBE (EASE):")
+print("KẾT QUẢ TRÊN PROBE (LightGCN):")
 print("-" * 60)
 recall, ndcg, ncrr = ranking_results
 
@@ -72,12 +77,9 @@ print("=" * 80)
 
 print("\nTạo submission.txt...")
 
-train_matrix = model.train_set.matrix
-B = model.B
-scores = train_matrix.dot(B)
+submission = []
 uid_map = model.train_set.uid_map
 iid_reverse_map = {v: k for k, v in model.train_set.iid_map.items()}
-submission = []
 
 for user in range(46612):
     uid = str(user + 1)
@@ -88,11 +90,9 @@ for user in range(46612):
 
     uid_idx = uid_map[uid]
 
-    s = scores[uid_idx]
-    if hasattr(s, "toarray"):
-        s = s.toarray().ravel()
+    s = model.score(uid_idx)
 
-    seen = train_matrix[uid_idx].indices
+    seen = train_set.matrix[uid_idx].indices
     s[seen] = -np.inf
 
     top_items = np.argpartition(-s, TOPK)[:TOPK]
@@ -101,8 +101,10 @@ for user in range(46612):
     top_original = [str(iid_reverse_map[i]) for i in top_items]
     submission.append(" ".join(top_original))
 
-with open("submission.txt", "w", encoding="utf-8") as f:
+with open("submission_lightgcn.txt", "w", encoding="utf-8") as f:
     f.write("\n".join(submission))
 
-print(f"Hoàn tất! File submission.txt tại: {os.path.abspath('submission.txt')}")
+print(
+    f"Hoàn tất! File submission_lightgcn.txt tại: {os.path.abspath('submission_lightgcn.txt')}"
+)
 print(f"- Số dòng: {len(submission)}")
